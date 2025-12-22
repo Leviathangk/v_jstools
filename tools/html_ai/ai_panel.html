@@ -1,0 +1,643 @@
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:sans-serif}
+  body{display:flex;justify-content:center;align-items:flex-start;height:100vh;background:#f0f2f5;padding:10px}
+  #app-container{width:100%;border-radius:16px;overflow:hidden;background:rgba(255,255,255,0.85);backdrop-filter:blur(10px);box-shadow:0 8px 24px rgba(0,0,0,0.2);}
+  /* Tabs */
+  #tabs{display:flex;background:#007aff;color:#fff;cursor:pointer}
+  #tabs div{flex:1;text-align:center;padding:10px;font-weight:bold;transition:0.2s}
+  #tabs .active{background:#005ecb}
+  /* Chat */
+  #chat-container{display:flex;flex-direction:column;height:calc(100vh - 65px);;display:none}
+  #chat-log{flex:1;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;scrollbar-width:thin;scrollbar-color:#ccc transparent;}
+  #chat-log::-webkit-scrollbar{width:6px}
+  #chat-log::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
+  .msg{max-width:80%;padding:10px 14px;border-radius:14px;line-height:1.4;word-break:break-word;transition:all 0.2s ease;}
+  .user{background:#007aff;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;box-shadow:0 2px 8px rgba(0,122,255,0.3)}
+  .ai,.assistant{background:#f1f1f3;color:#000;align-self:flex-start;border-bottom-left-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+  .tool{background:#e8ebf0;color:#333;align-self:flex-start;font-size:12px;border-bottom-left-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+  #input-area{display:flex;border-top:1px solid #ddd;background:#fff;backdrop-filter:blur(5px)}
+  #input-area input{flex:1;padding:12px;border:none;outline:none;font-size:14px;border-radius:0}
+  #input-area button{padding:12px 16px;border:none;background:#007aff;color:#fff;cursor:pointer;transition:background 0.2s}
+  #input-area button:hover{background:#005ecb}
+  /* Config */
+  #config-container{display:none;padding:12px;}
+  #config-container input, #config-container select{width:100%;margin-bottom:6px;padding:6px;border-radius:4px;border:1px solid #ccc}
+  #config-container button{padding:6px 12px;border:none;border-radius:4px;cursor:pointer;transition:0.2s;margin-right:4px}
+  #config-container button:hover{opacity:0.8}
+  #config-container #del-cfg-btn{background:#f44336;color:#fff}
+  #config-container #add-cfg-btn{background:#007aff;color:#fff}
+  .config-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;font-size:12px;color:#333;background:rgba(0,122,255,.08);border-bottom:1px solid rgba(0,0,0,.08)}
+  .config-bar span{font-weight:bold;color:#007aff}
+  .config-bar,#quick-switch-menu{-webkit-user-select:none;user-select:none}
+  .quick-switch{position:relative}
+  .quick-switch.hidden{display:none}
+  #quick-switch-btn, #conv-switch-btn{display:flex;align-items:center;gap:4px;padding:2px 8px;font-size:12px;border-radius:6px;background:rgba(0,0,0,.05);border:1px solid rgba(0,0,0,.15);cursor:pointer}
+  #quick-switch-btn:hover, #conv-switch-btn:hover{background:rgba(0,0,0,.1)}
+  #quick-switch-menu, #conv-switch-menu{position:absolute;top:100%;left:0;min-width:140px;margin-top:4px;background:#fff;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none;z-index:10}
+  #quick-switch-menu .item, #conv-switch-menu .item{padding:6px 10px;font-size:12px;cursor:pointer}
+  #quick-switch-menu .item:hover, #conv-switch-menu .item:hover{background:rgba(0,122,255,.1)}
+  #quick-switch-menu .item.active, #conv-switch-menu .item.active{font-weight:bold;color:#007aff}
+  .secret-input{font-family:monospace;letter-spacing:.08em;color:transparent;text-shadow:0 0 0 #333;caret-color:#333}
+  #config-container #add-cfg-btn{background:#007aff;color:#fff}
+  #config-container #del-cfg-btn{background:#f44336;color:#fff}
+  /* bubble */
+  @keyframes ui-bubble-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .ui-bubbles{position:fixed;right:8px;bottom:8px;z-index:99999;display:flex;flex-direction:column;gap:4px;font:12px monospace;user-select:none;pointer-events:none}
+  .ui-bubble{padding:4px 6px;max-width:320px;border:1px solid #555;background:#111;color:#ddd;white-space:pre-wrap;transition:opacity 0.5s ease,transform 0.5s ease;animation:ui-bubble-in .12s ease-out;}
+  .ui-bubble-error{border-color:#a33;color:#f99}
+  .ui-bubble-info{border-color:#666;color:#ccc}
+  .ui-confirm-mask{position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.35)}
+  .ui-confirm{width:280px;margin:20% auto;padding:6px;border:1px solid #555;background:#111;color:#ddd;font:12px monospace}
+  .ui-confirm-actions{margin-top:6px;display:flex;justify-content:flex-end;gap:4px}
+  pre, code {font-family: 'Fira Code', 'JetBrains Mono', 'Source Code Pro', Consolas, Menlo, Monaco, monospace;font-size: 13px;line-height: 1.4;}
+  /*pre {background: #1e1e1e;color: #ddd;padding: 8px 12px;border-radius: 6px;overflow-x: auto;max-width: 100%;}
+  code {background: #2d2d2d;color: #f8f8f2;padding: 2px 4px;border-radius: 4px;}*/
+  pre {background: #f5f5f5;color: #333;padding: 8px 12px;border-radius: 6px;overflow-x: auto;max-width: 100%;font-family: 'Fira Code','JetBrains Mono','Source Code Pro',Consolas,Menlo,Monaco,monospace;font-size: 13px;line-height: 1.5;}
+  code {background: #e8e8e8;color: #111;padding: 2px 4px;border-radius: 4px;font-family: 'Fira Code','JetBrains Mono','Source Code Pro',Consolas,Menlo,Monaco,monospace;font-size: 13px;}
+  span {font-family: 'Fira Code','JetBrains Mono','Source Code Pro',Consolas,Menlo,Monaco,monospace;font-size: 13px;}
+  #current-config-bar{display:flex;align-items:center;}
+  #current-config-bar > div:first-child{margin-right:auto;}
+  #close-chat-btn{margin-left:8px;}
+
+
+
+pre code.hljs{display:block;overflow-x:auto;padding:1em}code.hljs{padding:3px 5px}/*!
+  Theme: GitHub
+  Description: Light theme as seen on github.com
+  Author: github.com
+  Maintainer: @Hirse
+  Updated: 2021-05-15
+
+  Outdated base version: https://github.com/primer/github-syntax-light
+  Current colors taken from GitHub's CSS
+*/.hljs{color:#24292e;background:#fff}.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.language_{color:#d73a49}.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}.hljs-meta .hljs-string,.hljs-regexp,.hljs-string{color:#032f62}.hljs-built_in,.hljs-symbol{color:#e36209}.hljs-code,.hljs-comment,.hljs-formula{color:#6a737d}.hljs-name,.hljs-quote,.hljs-selector-pseudo,.hljs-selector-tag{color:#22863a}.hljs-subst{color:#24292e}.hljs-section{color:#005cc5;font-weight:700}.hljs-bullet{color:#735c0f}.hljs-emphasis{color:#24292e;font-style:italic}.hljs-strong{color:#24292e;font-weight:700}.hljs-addition{color:#22863a;background-color:#f0fff4}.hljs-deletion{color:#b31d28;background-color:#ffeef0}
+</style>
+
+<!-- 这里的js不能直接用，有点烦人 -->
+<!-- <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script> -->
+
+<div id="app-container">
+  <div id="tabs">
+    <div id="tab-chat" class="active">聊天</div>
+    <div id="tab-config">配置</div>
+  </div>
+  <!-- Chat -->
+  <div id="chat-container">
+    <div id="current-config-bar" class="config-bar" style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <!-- <span>当前配置：</span> -->
+        <div id="quick-switch" class="quick-switch hidden">
+          <button id="quick-switch-btn">
+            <span id="current-config-name">未选择</span>
+            <span class="arrow">▾</span>
+          </button>
+          <div id="quick-switch-menu"></div>
+        </div>
+        <span id="current-config-name-fallback">未选择</span>
+      </div>
+      <button id="clear-chat-btn" style="padding:4px 8px;font-size:12px;background:#f44336;color:#fff;border:none;border-radius:4px;cursor:pointer;">清空所有聊天</button>
+      <button id="close-chat-btn" style="padding:4px 8px;font-size:12px;background:#f44336;color:#fff;border:none;border-radius:4px;cursor:pointer;">关闭聊天窗</button>
+    </div>
+    <div id="conversation-bar" class="config-bar" style="gap:8px;">
+      <!-- <span>当前对话：</span> -->
+      <div id="conv-switch" class="quick-switch">
+        <button id="conv-switch-btn">
+          <span id="current-conv-name">默认对话</span>
+          <span class="arrow">▾</span>
+        </button>
+        <div id="conv-switch-menu"></div>
+      </div>
+      <button id="new-conv-btn"
+        style="padding:2px 8px;font-size:12px;border-radius:6px;
+               background:#007aff;color:#fff;border:none;cursor:pointer;">
+        ＋ 新建对话
+      </button>
+      <button id="del-conv-btn"
+        style="padding:2px 8px;font-size:12px;border-radius:6px;
+               background:#007aff;color:#fff;border:none;cursor:pointer;">
+        − 删除对话
+      </button>
+    </div>
+    <div id="chat-log"></div>
+    <div id="input-area">
+      <input type="text" id="user-input" placeholder="输入消息...">
+      <button id="send-btn">发送</button>
+    </div>
+  </div>
+  <!-- 弹窗 -->
+  <div id="template-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:9999;">
+    <div style="width:400px;max-width:90%;background:#111;color:#eee;margin:15% auto;padding:12px;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.6);">
+      <div style="font-weight:bold;margin-bottom:6px;">选择模板</div>
+      <div id="template-modal-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px;">
+        <button id="template-cancel-btn" style="padding:4px 8px;border:none;border-radius:4px;background:#555;color:#fff;cursor:pointer;">取消</button>
+      </div>
+    </div>
+  </div>
+  <!-- Config -->
+  <div id="config-container">
+    <div id="current-config-bar-config" class="config-bar">正在使用：
+      <span id="current-config-name-config">未选择</span>
+      <button id="select-template-btn" style="padding:6px 12px;border:none;border-radius:4px;background:#007aff;color:#fff;cursor:pointer;transition:0.2s;">
+        选择预设模板
+      </button>
+    </div>
+    <select id="config-select"></select>
+    <input type="text" id="cfg-name" placeholder="配置名称">
+    <input type="password" id="cfg-apiKey" placeholder="API Key" class="secret-input">
+    <input type="text" id="cfg-baseUrl" placeholder="Base URL">
+    <input type="text" id="cfg-path" placeholder="API Path (例如 /compatible-mode/v1/chat/completions)">
+    <input type="text" id="cfg-model" placeholder="Model">
+    <input type="text" id="cfg-system" placeholder="System Prompt">
+    <div style="display:flex;gap:4px;margin-top:4px;">
+      <button id="add-cfg-btn">保存/更新</button>
+      <button id="del-cfg-btn">删除</button>
+      <button id="export-cfg-btn">📤导出配置</button>
+      <button id="import-cfg-btn">📥导入配置</button>
+    </div>
+    <!-- 导入弹窗 -->
+    <div id="import-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;">
+      <div style="width:520px;max-width:90%;background:#111;color:#eee;margin:10% auto;padding:12px;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.6);">
+        <div style="font-weight:bold;margin-bottom:6px;">
+          粘贴配置 JSON（将覆盖本地配置）
+        </div>
+        <textarea id="import-textarea" spellcheck="false" style="width:100%;height:220px;background:#000;color:#0f0;font-family:monospace;font-size:12px;padding:6px;box-sizing:border-box;"></textarea>
+        <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px;">
+          <button id="import-cancel-btn">取消</button>
+          <button id="import-confirm-btn">确认导入</button>
+        </div>
+      </div>
+    </div>
+    <!-- 快捷键说明 -->
+    <div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:rgba(0,0,0,.04);border:1px dashed rgba(0,0,0,.2);font-size:12px;color:#333;">
+      <div style="font-weight:bold;color:#007aff;margin-bottom:6px;">
+        ⌨️ 快捷键说明（全局）
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;font-family:monospace;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="padding:2px 6px;border-radius:4px;background:#fff;border:1px solid rgba(0,0,0,.2);">Ctrl</span>
+          <span>+</span>
+          <span style="padding:2px 6px;border-radius:4px;background:#fff;border:1px solid rgba(0,0,0,.2);">/</span>
+          <span style="color:#666;">聚焦输入框</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="padding:2px 6px;border-radius:4px;background:#fff;border:1px solid rgba(0,0,0,.2);">Ctrl</span>
+          <span>+</span>
+          <span style="padding:2px 6px;border-radius:4px;background:#fff;border:1px solid rgba(0,0,0,.2);">[</span>
+          <span style="color:#666;">新建对话</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="padding:2px 6px;border-radius:4px;background:#fff;border:1px solid rgba(0,0,0,.2);">Ctrl</span>
+          <span>+</span>
+          <span style="padding:2px 6px;border-radius:4px;background:#fff;border:1px solid rgba(0,0,0,.2);">]</span>
+          <span style="color:#666;">删除当前对话</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.AI_PANEL_INIT = function ({ root, hostWindow }) {
+  var document = root instanceof ShadowRoot ? root : hostWindow.document;
+  // ===== 元素引用 =====
+  const tabChat = document.getElementById('tab-chat')
+  const tabConfig = document.getElementById('tab-config')
+  const appContainer = document.getElementById('app-container')
+  const chatContainer = document.getElementById('chat-container')
+  const configContainer = document.getElementById('config-container')
+  const chatLog = document.getElementById('chat-log')
+  const input = document.getElementById('user-input')
+  const sendBtn = document.getElementById('send-btn')
+  const cfgSelect = document.getElementById('config-select')
+  const cfgName = document.getElementById('cfg-name')
+  const cfgApiKey = document.getElementById('cfg-apiKey')
+  const cfgBaseUrl = document.getElementById('cfg-baseUrl')
+  const cfgPath = document.getElementById('cfg-path')
+  const cfgModel = document.getElementById('cfg-model')
+  const cfgSystem = document.getElementById('cfg-system')
+  const addCfgBtn = document.getElementById('add-cfg-btn')
+  const delCfgBtn = document.getElementById('del-cfg-btn')
+  const currentCfgNameChat = document.getElementById('current-config-name')
+  const currentCfgNameConfig = document.getElementById('current-config-name-config')
+  const quickSwitch = document.getElementById('quick-switch')
+  const quickBtn = document.getElementById('quick-switch-btn')
+  const quickMenu = document.getElementById('quick-switch-menu')
+  const currentNameSpan = document.getElementById('current-config-name')
+  const fallbackSpan = document.getElementById('current-config-name-fallback')
+  const clearChatBtn = document.getElementById('clear-chat-btn')
+  const importModal = document.getElementById('import-modal');
+  const exportCfgBtn = document.getElementById('export-cfg-btn')
+  const importCfgBtn = document.getElementById('import-cfg-btn')
+  const importCancelBtn = document.getElementById('import-cancel-btn')
+  const importConfirmBtn = document.getElementById('import-confirm-btn')
+  // ===== 初始化聊天历史 =====
+  function initChatLog(){
+    const history = loadHistory()
+    chatLog.innerHTML = ''
+    history.forEach(function(msg){
+      if (msg.role == 'tool'){ return }
+      if (msg.role == 'assistant' && msg.tool_calls){ 
+        var tool_call_name = msg.tool_calls[0].function.name
+        return addMessage('[*] api调用:' + tool_call_name, 'tool') 
+      }
+      addMessage(msg.content, msg.role)
+    })
+  }
+  // ===== 清空聊天 =====
+  clearChatBtn.addEventListener('click', () => {
+    localStorage.removeItem('chatHistory')
+    chatLog.innerHTML = ''
+    notify('聊天记录已清空', 'info')
+  })
+  // ===== 气泡函数 =====
+  function notify(msg,type='info',ms=1000){
+    let box=document.querySelector('.ui-bubbles');
+    if(!box){
+      box=document.createElement('div');
+      box.className='ui-bubbles';
+      appContainer.appendChild(box);
+    }
+    const el=document.createElement('div');
+    el.className='ui-bubble ui-bubble-'+type;
+    el.textContent=msg;
+    box.appendChild(el);
+    setTimeout(()=>{
+      el.style.opacity='0';
+      el.style.transform='translateY(4px)';
+      setTimeout(()=>el.remove(),120);
+    },ms);
+  }
+  exportCfgBtn.onclick = () => {
+    const ai_configs = JSON.parse(localStorage.getItem('v_ai_configs') || '{}');
+    const ai_last_used = localStorage.getItem('v_ai_last_used') || '';
+    var data = {ai_configs, ai_last_used}
+    prompt('复制下面内容', JSON.stringify(data));
+  };
+  importCfgBtn.onclick = () => {
+    document.getElementById('import-textarea').value = '';
+    importModal.style.display = 'block';
+  };
+  importCancelBtn.onclick = () => {
+    importModal.style.display = 'none';
+  };
+  importConfirmBtn.onclick = () => {
+    const txt = document.getElementById('import-textarea').value.trim();
+    if (!txt) return notify('内容为空', 'error');
+    let obj;
+    try {
+      obj = JSON.parse(txt);
+    } catch (e) {
+      return notify('❌ JSON 解析失败', 'error');
+    }
+    if (typeof obj !== 'object' || Array.isArray(obj)) {
+      return notify('❌ 配置格式必须是对象', 'error');
+    }
+    localStorage.setItem('v_ai_configs', JSON.stringify(obj.ai_configs))
+    localStorage.setItem('v_ai_last_used', obj.ai_last_used)
+    importModal.style.display = 'none';
+    configs = JSON.parse(localStorage.getItem('v_ai_configs') || '{}')
+    refreshConfigSelect()
+    notify('✅ 配置导入成功');
+  };
+  // ===== Tabs 切换 =====
+  tabChat.addEventListener('click', () => {
+    tabChat.classList.add('active'); tabConfig.classList.remove('active')
+    chatContainer.style.display = 'flex'
+    configContainer.style.display = 'none'
+  })
+  tabConfig.addEventListener('click', () => {
+    tabConfig.classList.add('active'); tabChat.classList.remove('active')
+    chatContainer.style.display = 'none'
+    configContainer.style.display = 'block'
+  })
+  // ===== 配置管理 =====
+  function renderQuickSwitch() {
+    const keys = Object.keys(configs)
+    if (keys.length <= 1) {
+      quickSwitch.classList.add('hidden')
+      fallbackSpan.style.display = 'inline'
+      fallbackSpan.textContent = keys[0] || '未选择'
+      return
+    }
+    quickSwitch.classList.remove('hidden')
+    fallbackSpan.style.display = 'none'
+    quickMenu.innerHTML = ''
+    keys.forEach(name => {
+      const div = document.createElement('div')
+      div.className = 'item' + (currentConfig && cfgName.value === name ? ' active' : '')
+      div.textContent = name
+      div.onclick = () => {
+        loadConfig(name)
+        setLastUsedConfig(name)
+        quickMenu.style.display = 'none'
+      }
+      quickMenu.appendChild(div)
+    })
+  }
+  function updateCurrentConfigUI(name) {
+    const text = name || '未选择'
+    currentCfgNameChat.textContent = text
+    currentCfgNameConfig.textContent = text
+  }
+  let configs = JSON.parse(localStorage.getItem('v_ai_configs') || '{}')
+  let currentConfig = null
+  function setLastUsedConfig(name){ localStorage.setItem('v_ai_last_used', name) }
+  function saveConfigs(){ localStorage.setItem('v_ai_configs', JSON.stringify(configs)) }
+  function refreshConfigSelect(){
+    cfgSelect.innerHTML = ''
+    const lastUsed = localStorage.getItem('v_ai_last_used')
+    const keys = Object.keys(configs)
+    if(lastUsed && configs[lastUsed]){
+      const opt = document.createElement('option')
+      opt.value = lastUsed; opt.textContent = lastUsed
+      cfgSelect.appendChild(opt)
+    }
+    keys.forEach(key=>{
+      if(key === lastUsed) return
+      const opt = document.createElement('option')
+      opt.value = key; opt.textContent = key
+      cfgSelect.appendChild(opt)
+    })
+    if(cfgSelect.options.length>0){
+      const defaultName = lastUsed && configs[lastUsed] ? lastUsed : cfgSelect.options[0].value
+      cfgSelect.value = defaultName
+      loadConfig(defaultName)
+    }
+  }
+  function loadConfig(name){
+    const cfg=configs[name]; if(!cfg) return
+    currentConfig=cfg
+    cfgName.value = name
+    cfgApiKey.value = cfg.apiKey
+    cfgBaseUrl.value = cfg.baseUrl
+    cfgPath.value = cfg.path
+    cfgModel.value = cfg.model
+    cfgSystem.value = cfg.system
+    updateCurrentConfigUI(name)
+    renderQuickSwitch()
+  }
+  addCfgBtn.addEventListener('click', ()=>{
+    const name=cfgName.value.trim(); if(!name) return notify('请输入配置名称')
+    configs[name] = {
+      apiKey: cfgApiKey.value.trim(),
+      baseUrl: cfgBaseUrl.value.trim(),
+      path: cfgPath.value.trim(),
+      model: cfgModel.value.trim(),
+      system: cfgSystem.value.trim()
+    }
+    saveConfigs()
+    setLastUsedConfig(name)
+    refreshConfigSelect()
+    renderQuickSwitch()
+    notify('配置已保存')
+  })
+  delCfgBtn.addEventListener('click', ()=>{
+    const name=cfgSelect.value; if(!name) return
+    delete configs[name]
+    saveConfigs()
+    refreshConfigSelect()
+    renderQuickSwitch()
+    notify('配置已删除')
+  })
+  cfgSelect.addEventListener('change', function(e){
+    loadConfig(e.target.value)
+    setLastUsedConfig(e.target.value)
+  })
+  refreshConfigSelect()
+  renderQuickSwitch()
+  quickBtn.onclick = (e) => {
+    e.stopPropagation()
+    quickMenu.style.display = quickMenu.style.display === 'block' ? 'none' : 'block'
+  }
+  document.addEventListener('click', () => {
+    quickMenu.style.display = 'none'
+  })
+  // ===== 聊天逻辑 =====
+  function addMessage(msg,sender){
+    const div=document.createElement('div')
+    div.className='msg '+sender
+    if (typeof hljs != 'undefined'){
+      div.innerHTML = marked.parse(msg);
+      div.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+      });
+    }else{
+      div.textContent=msg
+    }
+    chatLog.appendChild(div)
+    chatLog.scrollTop=chatLog.scrollHeight
+  }
+  function loadHistory(){ try{return JSON.parse(localStorage.getItem('chatHistory')||'[]')}catch(e){return []} }
+  function saveHistory(data){ return localStorage.setItem('chatHistory', JSON.stringify(data)) }
+  function tool_config(){
+    return [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_current_page_html_content",
+          "description": "获取当前页面的 html 的内容，对于分析页面结构解析 xpath 比较有帮助。",
+          "parameters": {}
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "get_current_page_url",
+          "description": "获取当前页面的 url 的内容。",
+          "parameters": {}
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "get_current_page_article",
+          "description": "获取当前页面的文字内容，用于分析文章信息，用于总结摘要。",
+          "parameters": {}
+        }
+      },
+    ]
+  }
+  function getCleanDocumentClone() {
+    const clone = document.cloneNode(true);
+    const removals = [
+      ...clone.querySelectorAll('script'),
+      ...clone.querySelectorAll('style'),
+      ...clone.querySelectorAll('link[rel="stylesheet"]'),
+      ...clone.querySelectorAll('meta'),
+      ...clone.querySelectorAll('noscript')
+    ];
+    removals.forEach(el => el.remove());
+    const walker = document.createTreeWalker(clone, NodeFilter.SHOW_COMMENT, null, false);
+    let comment;
+    const comments = [];
+    while (comment = walker.nextNode()) { comments.push(comment); }
+    comments.forEach(comment => comment.remove());
+    return clone.documentElement.innerHTML;
+  }
+  function callTool(name, args){
+    return new Promise(function(res, rej){
+      if (name == 'get_current_page_url'){ return res(location.href) }
+      if (name == 'get_current_page_html_content'){ return res(getCleanDocumentClone()) }
+      if (name == 'get_current_page_article'){ return res(document.documentElement.innerText) }
+    })
+  }
+  async function aiReplyStream(userDataMsg, msgList){
+    if(!currentConfig) return notify('请先选择一个配置')
+    let userMsgs = msgList ? msgList : loadHistory()
+    const messages=[]
+    if (typeof userDataMsg == 'string'){
+      userMsgs.push({role:'user', content: userDataMsg})
+    }else if (typeof userDataMsg == 'object' && userDataMsg.role){
+      userMsgs.push(userDataMsg)
+    }
+    if (currentConfig.system){ messages.push({role:'system', content: currentConfig.system}) }
+    for (var i=0;i<userMsgs.length;i++) { messages.push(userMsgs[i]) }
+    addMessage('','ai')
+    const lastDiv = chatLog.querySelector('.ai:last-child')
+    try{
+      const resp = await fetch(currentConfig.baseUrl + currentConfig.path, {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Accept':'text/event-stream',
+          'Authorization':'Bearer '+currentConfig.apiKey
+        },
+        body: JSON.stringify({
+          model: currentConfig.model,
+          messages: messages,
+          stream:true,
+          max_tokens:2048,
+          tool_choice: "auto",
+          tools:tool_config(),
+        })
+      })
+      console.log('[*] messages', messages)
+      if(!resp.ok){
+        let errText = ''
+        try{
+          errText = await resp.text()
+        }catch(e){}
+        throw new Error(`HTTP ${resp.status} ${resp.statusText}${errText?': '+errText:''}`)
+      }
+      if(!resp.body){
+        throw new Error('Response body is empty')
+      }
+      const reader = resp.body.getReader()
+      const decoder = new TextDecoder('utf-8')
+      let buffer=''
+      let full_text=''
+      let tool_call_name=''
+      let tool_call_args=''
+      let tool_call_id=''
+      let end=false
+      let role_type=''
+      function add_log(txt){
+        full_text += txt
+        if (typeof hljs != 'undefined'){
+          lastDiv.innerHTML = marked.parse(full_text);
+          lastDiv.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+          });
+        }else{
+          lastDiv.textContent += txt
+        }
+        chatLog.scrollTop = chatLog.scrollHeight
+      }
+      while(!end){
+        const {value,done}=await reader.read()
+        if(done) break
+        buffer += decoder.decode(value,{stream:true})
+        let lines=buffer.split('\n')
+        for(let i=0;i<lines.length-1;i++){
+          let line=lines[i].trim()
+          if(!line) continue
+          if(line.startsWith('data: ')) line=line.slice(6)
+          if(line==='[DONE]') {
+            end=true
+            break
+          }
+          try{
+            const jsonData=JSON.parse(line)
+            if(jsonData.choices && jsonData.choices.length>0){
+              const finish_reason = jsonData.choices[0]?.finish_reason
+              const tcalls = jsonData.choices[0].delta?.tool_calls
+              if (finish_reason == "tool_calls"){
+                end=true
+                break
+              }
+              if (tcalls){
+                role_type = 'tool'
+                lastDiv.className = 'msg tool'
+                if (tcalls[0].id){
+                  tool_call_id=tcalls[0].id
+                }
+                if (tcalls[0].function.name){
+                  tool_call_name=tcalls[0].function.name
+                  add_log('[*] api调用:' + tool_call_name)
+                }
+                if (tcalls[0].function.arguments){
+                  tool_call_args+=tcalls[0].function.arguments
+                }
+              }else{
+                role_type = 'ai'
+                const chunk = jsonData.choices[0].delta?.content||''
+                add_log(chunk)
+              }
+            }
+          }catch(e){}
+        }
+        buffer = lines[lines.length-1]
+      }
+      if (role_type == 'ai'){
+        userMsgs.push({"role": "assistant", "content": full_text})
+        saveHistory(userMsgs)
+      }else if (role_type == 'tool'){
+        userMsgs.push({"role": "assistant", "tool_calls": [
+          {
+            id: tool_call_id,
+            function: {
+              name: tool_call_name,
+              arguments: tool_call_args,
+            }
+          }
+        ]})
+        callTool(tool_call_name, tool_call_args)
+        .then(function(res){
+          aiReplyStream({"role": "tool", "content": JSON.stringify(res), "tool_call_id": tool_call_id}, userMsgs)
+        })
+        .catch(function(err){
+          throw Error('error.' + err)
+        })
+      }
+    }catch(err){ debugger;lastDiv.textContent='[Error: '+err.message+']' }
+  }
+  function sendMessage(){
+    const text=input.value.trim(); if(!text) return
+    addMessage(text,'user'); input.value=''
+    aiReplyStream(text)
+  }
+  sendBtn.addEventListener('click', sendMessage)
+  input.addEventListener('keypress', e=>{ if(e.key==='Enter') sendMessage() })
+  // ===== 初始化 =====
+  function initTabs() {
+    if (Object.keys(configs).length > 0) {
+      tabChat.classList.add('active'); tabConfig.classList.remove('active')
+      chatContainer.style.display = 'flex'
+      configContainer.style.display = 'none'
+    } else {
+      tabConfig.classList.add('active'); tabChat.classList.remove('active')
+      chatContainer.style.display = 'none'
+      configContainer.style.display = 'block'
+    }
+  }
+  initTabs()
+  initChatLog()
+}
+
+//------
+
+AI_PANEL_INIT({host: document, hostWindow: window})
+</script>

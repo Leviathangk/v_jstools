@@ -444,6 +444,7 @@ importScripts(
 )
 var config_list = [
   "config-hook-global",
+  "config-hook-dark-mode",
   // "config-hook-test",
   "config-hook-cookie",
   "config-hook-cookie-add-debugger",
@@ -542,7 +543,20 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     var config_temp = {}
     for (var [key, { oldValue, newValue }] of Object.entries(changes)) {
       if (key == "config-hook-global"){
-        if (newValue){ registerDynamicScript() }else{ unregisterDynamicScripts() }
+        if (newValue){ 
+          if (config_dict["config-hook-dark-mode"]){
+            registerDynamicScript_dark()
+          }else{
+            registerDynamicScript()
+          }
+        }else{ unregisterDynamicScripts() }
+      }
+      if (key == "config-hook-dark-mode" && config_dict["config-hook-global"]){
+        if (newValue){
+          registerDynamicScript_dark()
+        }else{
+          registerDynamicScript()
+        }
       }
       if (config_list.indexOf(key) != -1){
         config_dict[key] = newValue
@@ -645,9 +659,8 @@ chrome.webNavigation.onCommitted.addListener( async (details) => {
 });
 
 async function unregisterDynamicScripts(){
-  return await chrome.scripting.unregisterContentScripts({
-    ids: ['dynamic-script-v3']
-  }).catch(e => {})
+  await chrome.scripting.unregisterContentScripts({ids: ['dynamic-script-v3']}).catch(e => {})
+  await chrome.scripting.unregisterContentScripts({ids: ['dynamic-script-v3-dark']}).catch(e => {})
 }
 async function registerDynamicScript() {
   try {
@@ -666,9 +679,30 @@ async function registerDynamicScript() {
     throw error;
   }
 }
-chrome.storage.local.get(["config-hook-global"],function(e){
+async function registerDynamicScript_dark() {
+  try {
+    await unregisterDynamicScripts()
+    await chrome.scripting.registerContentScripts([{
+      allFrames: true,
+      id: 'dynamic-script-v3-dark',
+      matches: ["http://*/*", "https://*/*"],
+      js: ['tools/common/dyn_script_v3_dark.js'],
+      runAt: 'document_start',
+      world: 'MAIN',
+      matchOriginAsFallback: true,
+    }])
+  } catch (error) {
+    console.error('注册脚本失败:', error);
+    throw error;
+  }
+}
+chrome.storage.local.get(["config-hook-global", "config-hook-dark-mode"],function(e){
   if (e["config-hook-global"]){
-    registerDynamicScript()
+    if (e["config-hook-dark-mode"]){
+      registerDynamicScript_dark()
+    }else{
+      registerDynamicScript()
+    }
   }
 })
 
@@ -815,6 +849,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'get_url'){
     fetch(msg.message.url)
       .then(response => response.json())
+      .then(data => sendResponse({status:'success', message:data}))
+      .catch(error => sendResponse({status:'error', message:`fail load url ${msg.message.url}:\n\n\n ${error}`}));
+    return true
+  }
+  if (msg.action === 'get_file'){
+    const url = chrome.runtime.getURL(msg.path);
+    fetch(url)
+      .then(response => response.text())
       .then(data => sendResponse({status:'success', message:data}))
       .catch(error => sendResponse({status:'error', message:`fail load url ${msg.message.url}:\n\n\n ${error}`}));
     return true

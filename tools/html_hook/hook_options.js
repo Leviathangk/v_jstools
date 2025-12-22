@@ -170,6 +170,7 @@ function make_default_set(toggle){
     var default_false = [
       'config-hook-setTimeout',
       'config-hook-setInterval',
+      'config-hook-dark-mode',
     ]
     var setd = {}
     setd['config-hook-log-toggle'] = toggle

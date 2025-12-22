@@ -272,6 +272,8 @@ var config_list4 = [
   ['AST 工具', 'deobjs_page', 'btn btn-main'],
   ['AST 分析', 'inject_deobjs_page', 'btn'],
   ['WASM 分析', 'inject_wasm_page', 'btn'],
+  ['获取 cookie', 'get_cookies', 'btn'],
+  ['ai 助手', 'ai_agent', 'btn'],
 ]
 var config_one_list = [
   ['[manifest v3]:1.0 功能配置', 'base_config', 'btn btn-main']
@@ -360,8 +362,8 @@ function add_inject_short_config(){
   })
   var expanded_tg_name = 'config-popup_expanded'
   function toggleLabelList() {
-    const list = document.getElementById('labelList');
-    const arrow = document.querySelector('.label-arrow');
+    var list = document.getElementById('labelList');
+    var arrow = document.querySelector('.label-arrow');
     list.classList.toggle('expanded');
     if (list.classList.contains('expanded')) {
       arrow.textContent = '▲';
@@ -379,45 +381,6 @@ function add_inject_short_config(){
   gtLocal(expanded_tg_name, function(e){
     if (e){ toggleLabelList() }
   })
-}
-
-function make_inject_ast_page_alert(url){
-  return `
-无法在 chrome:// 页面使用该功能
-
-当前页面: ${url}
-
-请在 http/https/file 页面中使用该功能
-  `.trim()
-}
-
-function run_local_id_avoid_chrome(func){
-  chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
-    if (tabs[0].url.startsWith('chrome')){
-      alert(make_inject_ast_page_alert(tabs[0].url))
-    }else{
-      func(tabs[0].id)
-    }
-  });
-}
-
-function run_codes(tabId, input, world){
-  if (typeof input == 'function'){
-    return chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      func: input,
-      args: [],
-      injectImmediately: true,
-      world: world,
-    })
-  }else{
-    return chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      files: input,
-      injectImmediately: true,
-      world: world,
-    })
-  }
 }
 function inject_ast_page_in_local_page(){
   function inject_ast_page(tabId){
@@ -468,6 +431,182 @@ function inject_wasm_page_in_local_page(){
   run_local_id_avoid_chrome(inject_wasm_page)
 }
 
+function inject_window_txt(txt){
+  var hash = Math.random().toString(36).slice(2, 8);
+  var cssPrefix = `copy-modal-${hash}`;
+  var style = document.createElement('style');
+  style.textContent = `
+    :host {
+      all: initial !important;
+    }
+    .${cssPrefix}-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2147483647;
+    }
+    .${cssPrefix}-modal {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      width: 80%;
+      max-width: 600px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    .${cssPrefix}-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .${cssPrefix}-title {
+      font-size: 18px;
+      color: #333;
+      margin: 0;
+    }
+    .${cssPrefix}-close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+      line-height: 1;
+    }
+    .${cssPrefix}-textarea {
+      width: 100%;
+      height: 300px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      resize: vertical;
+      font-family: monospace;
+      box-sizing: border-box;
+    }
+  `;
+  function pack_cookies_1(cookies){
+    if (cookies){return cookies.map(function(a){return a.name+'='+a.value}).join('; ')}
+  }
+  function pack_cookies_2(cookies){
+    if (cookies){return JSON.stringify(cookies,0,2)}
+  }
+  document.head.appendChild(style);
+
+  var host = document.createElement("div");
+  document.body.appendChild(host);
+  var shadow = host.attachShadow({ mode: "open" });
+  function createCopyModal(content) {
+    var overlay = document.createElement('div');
+    overlay.className = `${cssPrefix}-overlay`;
+    var modal = document.createElement('div');
+    modal.className = `${cssPrefix}-modal`;
+    var header = document.createElement('div');
+    header.className = `${cssPrefix}-header`;
+    var title = document.createElement('h3');
+    title.className = `${cssPrefix}-title`;
+    title.textContent = '当前页面中的 cookie (包含HttpOnly)';
+    var closeBtn = document.createElement('button');
+    closeBtn.className = `${cssPrefix}-close-btn`;
+    closeBtn.innerHTML = '&times;';
+    closeBtn.onclick = () => overlay.remove();
+    var textarea = document.createElement('textarea');
+    textarea.spellcheck = false;
+    textarea.wrap="off"
+    textarea.className = `${cssPrefix}-textarea`;
+    textarea.value = pack_cookies_1(content);
+    textarea.onclick = () => textarea.select();
+    var textarea2 = document.createElement('textarea');
+    textarea2.spellcheck = false;
+    textarea2.className = `${cssPrefix}-textarea`;
+    textarea2.value = pack_cookies_2(content);
+    textarea2.onclick = () => textarea2.select();
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+    modal.appendChild(header);
+    var content_str = pack_cookies_1(content);
+    var temp = document.createElement('h6');
+    temp.className = `${cssPrefix}-title`;
+    temp.textContent = '全字符串cookie';
+    var format0_btn = document.createElement('button');
+    format0_btn.innerText = '单行格式化'
+    format0_btn.addEventListener('click', function(){
+      textarea.value = content_str
+    })
+    var format1_btn = document.createElement('button');
+    format1_btn.innerText = '多行格式化'
+    format1_btn.addEventListener('click', function(){
+      textarea.value = content_str.split('; ').join(';\n')
+    })
+    var format2_btn = document.createElement('button');
+    format2_btn.innerText = '按python格式化'
+    format2_btn.addEventListener('click', function(){
+      var val = content_str
+      var vals = val.split('; ')
+      if (vals){
+        var ret = 'cookies = "".join([\n'
+        for (var i = 0; i < vals.length; i++) {
+          ret += '    ' + JSON.stringify(vals[i] + '; ') + ',\n'
+        }
+        ret += '])'
+      }else{
+        var ret = 'cookies = ""'
+      }
+      textarea.value = ret
+    })
+    var format3_btn = document.createElement('button');
+    format3_btn.innerText = '按js格式化'
+    format3_btn.addEventListener('click', function(){
+      var val = content_str
+      var vals = val.split('; ')
+      if (vals){
+        var ret = 'var cookies = (\n'
+        for (var i = 0; i < vals.length; i++) {
+          ret += '    ' + (i == 0 ? '' : '+') + JSON.stringify(vals[i] + '; ') + '\n'
+        }
+        ret += ')'
+      }else{
+        var ret = 'cookies = ""'
+      }
+      textarea.value = ret
+    })
+    modal.appendChild(temp);
+    modal.appendChild(format0_btn);
+    modal.appendChild(format1_btn);
+    modal.appendChild(format2_btn);
+    modal.appendChild(format3_btn);
+    modal.appendChild(textarea);
+    var temp = document.createElement('h6');
+    temp.className = `${cssPrefix}-title`;
+    temp.textContent = '全信息cookie';
+    modal.appendChild(temp);
+    modal.appendChild(textarea2);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {overlay.remove(); host.remove()}
+    });
+    shadow.appendChild(style);
+    shadow.appendChild(overlay);
+  }
+  createCopyModal(txt);
+}
+
+function get_cookies_in_local_page(){
+  run_local_id_avoid_chrome(function(tabId){
+    chrome.tabs.get(tabId, function(tab){
+      var url = tab.url;
+      chrome.cookies.getAll({url}, function (cookies){
+        console.log("cookies:", cookies);
+        run_codes(tab.id, inject_window_txt, 'ISOLATED', [cookies])
+      });
+    })
+  })
+}
 
 function init_all(){
   add_tg_in_html(config_tg)
@@ -503,6 +642,8 @@ function init_all(){
   $('base_config')            ?.addEventListener('click', function(){ CU('tools/html_base/base_config.html') })
   $('inject_deobjs_page')     ?.addEventListener('click', function(){ inject_ast_page_in_local_page() ;})
   $('inject_wasm_page')       ?.addEventListener('click', function(){ inject_wasm_page_in_local_page() ;})
+  $('get_cookies')            ?.addEventListener('click', function(){ get_cookies_in_local_page() ;})
+  $('ai_agent')               ?.addEventListener('click', function(){ open_ai_agent() ;})
 }
 
 var config_toggles = {
@@ -510,7 +651,7 @@ var config_toggles = {
   'config-page-copyer_1': ['copy_curr_page_resource'],
   'config-page-copyer_2': ['copy_curr_page_html'],
   'config-events-lisener': ['hook_and_record_events'],
-  'config-tools-package': ['ast_page','diff_page','deobjs_page','pack_code_model', 'inject_deobjs_page', 'inject_wasm_page'],
+  'config-tools-package': ['ast_page','diff_page','deobjs_page','pack_code_model', 'inject_deobjs_page', 'inject_wasm_page', 'get_cookies', 'ai_agent'],
   'config-tools-create-env': ['create_env', 'create_high_env'],
   'config-tools-easy-proxy': ['config-pac_proxy', 'proxy_page'],
   'config-tools-cdp-inject': ['inject_code', 'inject_code_cfg'],

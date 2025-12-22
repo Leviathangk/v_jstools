@@ -4,7 +4,16 @@
 一个用于js页面逆向调试的工具。
 ```
 
-2025/07/16: 更新了插件的 manifest V3 版本，重构了代码。旧版已留档：[manifest v2 版本在此下载](https://github.com/cilame/v_jstools/releases/tag/mainfest.v2)
+2025/12/22: 更新
+```
+1 【启用工具包功能】 增加一个简版的 ai 助手功能。
+    有配置用于测试的两个 function call 接口，用于后续拓展
+    如有需求，我可以看情况添加或者后续再想办法把 function call 弄成可配置状态
+2 【启用工具包功能】 增加获取页面 cookie 功能（可以包含 httponly）
+3 【启用代码注入功能】 hook 工具输出内容支持 dark 模式。
+```
+
+2025/07/16: 更新了插件的 manifest V3 版本，重构了代码。旧版已留档：[manifest v2 旧版本在此下载](https://github.com/cilame/v_jstools/releases/tag/mainfest.v2)
 
 当前是 manifest V3 版本 (完整功能需要 chrome 大于105版本)
 
